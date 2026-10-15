@@ -1,36 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jev Loan Eligibility Demo
 
-## Getting Started
+A small Next.js portfolio demo that sends synthetic loan application details to Jev and shows both its raw response and a processed assessment. It is not a real lending or underwriting system. No approval, denial, or loan offer is issued.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Install dependencies with `npm install`.
+2. Copy `.env.example` to `.env` and set your server-side `JEV_API_KEY`.
+3. Start the app with `npm run dev` and open [http://localhost:3000](http://localhost:3000).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The API key is only read by the server route. Do not add a `NEXT_PUBLIC_` prefix. `.env` and `.env.local` are ignored by Git.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo flow
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The application form posts to `POST /api/loan-eligibility`. The route validates input with Zod, estimates a monthly payment using an illustrative fixed 18% annual rate, and sends the inputs and estimate to `https://api.typesafe.ai/v1/systemone`. The demo returns an Approved or Manual review outcome and includes Jev's raw answers, estimated payment, commitments-to-income ratio, and a structured list of the application inputs considered as evidence. The evidence records submitted values and calculations; it does not claim that a factor caused the outcome.
 
-## Learn More
+Four synthetic scenarios are available in the UI: comfortable repayment, high existing debt, limited repayment history, and variable income. These are examples for exploring the interface, not validated lending criteria. The rate and results are illustrative; real underwriting requires an institution's validated policy, verified information, fair-lending review, and human oversight.
 
-To learn more about Next.js, take a look at the following resources:
+## Fictional demo screen
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The sample **Approved** outcome requires all four illustrative checks: estimated monthly debt commitments at or below 35% of gross income, at least 12 months in current employment, salaried income, and clean reported repayment history. Other cases return **Manual review**. These are made-up demo rules for predictable examples, not validated lending criteria.
