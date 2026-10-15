@@ -1,66 +1,62 @@
-import type { LoanResult } from "@/lib/jev";
+import type { FraudResult } from "@/lib/jev";
 
-type Props = { result: LoanResult };
+type Props = { result: FraudResult };
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 const money = (value: number) => new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 0 }).format(value);
-const eligibilityLabels: Record<string, string> = {
-  approved: "Approved",
+const actions: Record<string, string> = {
+  allow: "Allow transaction",
+  step_up_auth: "Request verification",
   manual_review: "Manual review",
+  block: "Recommend block",
 };
-const nextStepLabels: Record<string, string> = {
-  verify_income: "Verify income and obligations",
-  request_more_information: "Request more information",
-  human_review: "Assign to a human reviewer",
-  reassess_loan_terms: "Discuss different loan terms",
-  continue_demo_review: "Continue to human review",
-};
+const riskLabels: Record<string, string> = { low: "Low", medium: "Medium", high: "High" };
 
 export default function DecisionResult({ result }: Props) {
   const data = result.processed;
-  const decision = data.eligibility.toLowerCase();
-  const isApproved = decision === "approved";
-  const outcomeClass = isApproved ? "positive" : "review";
-  const ratio = percent(data.commitmentsToIncomeRatio);
+  const decision = data.decision.toLowerCase();
+  const outcomeClass = decision === "allow" ? "positive" : decision === "block" ? "caution" : "review";
+  const risk = data.riskLevel.toLowerCase();
+  const ratio = percent(data.fraudProbability);
 
   return (
     <section className="assessment-card" aria-live="polite">
       <div className="assessment-heading">
-        <div><span className="eyebrow">JEV APPLICATION ASSESSMENT</span><h2>Decision and evidence</h2></div>
+        <div><span className="eyebrow">JEV FRAUD ASSESSMENT</span><h2>Transaction result</h2></div>
         <span className="model-tag">{result.raw.model}</span>
       </div>
       <div className={`outcome-banner outcome-${outcomeClass}`}>
-        <div><span className="metric-label">DEMO DECISION · {percent(data.confidence)} confidence</span><strong>{eligibilityLabels[decision] ?? "Manual review"}</strong></div>
-        <span className="outcome-marker" aria-hidden="true">{isApproved ? "✓" : "↗"}</span>
+        <div><span className="metric-label">RECOMMENDED ACTION · {percent(data.decisionConfidence)} confidence</span><strong>{actions[decision] ?? "Manual review"}</strong></div>
+        <span className="outcome-marker" aria-hidden="true">{decision === "allow" ? "✓" : decision === "block" ? "!" : "↗"}</span>
       </div>
-      <div className="metrics-grid loan-metrics">
-        <article className="metric">
-          <span className="metric-label">Estimated monthly payment</span>
-          <strong className="metric-value metric-money">{money(data.estimatedMonthlyPayment)}</strong>
-          <span className="metric-note">{money(data.estimatedMonthlyCommitments)} incl. existing debt</span>
+      <section className="confidence-context" aria-label="Confidence and evidence quality">
+        <div className="confidence-heading"><div><span className="panel-kicker">CONFIDENCE CONTEXT</span><h3>How to read this result</h3></div><span className="evidence-quality">Unverified inputs</span></div>
+        <div className="confidence-grid">
+          <div className="confidence-stat"><span>Jev risk-level confidence</span><strong>{percent(data.riskConfidence)}</strong><small>Confidence in the selected risk level, not validated accuracy</small></div>
+          <div className="confidence-stat"><span>Input coverage</span><strong>{data.inputCoverage.provided} / {data.inputCoverage.required}</strong><small>Required transaction fields supplied</small></div>
+        </div>
+      </section>
+      <div className="metrics-grid loan-metrics fraud-metrics">
+        <article className={`metric risk-metric risk-${risk}`}>
+          <span className="metric-label">Risk level</span>
+          <strong className="metric-value">{riskLabels[risk] ?? "Review"}</strong>
+          <span className="metric-note">{percent(data.riskConfidence)} model confidence</span>
         </article>
-        <article className="metric">
-          <span className="metric-label">Commitments / gross income</span>
+        <article className="metric fraud-probability">
+          <span className="metric-label">Estimated fraud likelihood</span>
           <strong className="metric-value">{ratio}</strong>
-          <div className="meter" role="img" aria-label={`${ratio} estimated monthly commitments relative to gross income`}><span style={{ width: `${Math.min(100, Math.max(0, data.commitmentsToIncomeRatio * 100))}%` }} /></div>
-        </article>
-        <article className="metric metric-action loan-next-step">
-          <span className="metric-label">Recommended next action</span>
-          <strong className="metric-value">{nextStepLabels[data.nextStep.toLowerCase()] ?? "Route to a human reviewer"}</strong>
-          <span className="metric-note">Jev confidence: {percent(data.nextStepConfidence)} · human review required</span>
+          <div className="meter" role="img" aria-label={`${ratio} estimated fraud likelihood`}><span style={{ width: ratio }} /></div>
         </article>
       </div>
       <div className="signals-block evidence-block">
-        <div className="signals-title"><h3>Evidence considered</h3><span>{data.evidence.length} application factors</span></div>
+        <div className="signals-title"><h3>Evidence considered</h3><span>{data.evidence.length} factors</span></div>
         <dl className="evidence-list">
           {data.evidence.map((item) => (
-            <div className="evidence-row" key={item.factor}>
-              <dt>{item.factor}</dt><dd>{item.value}</dd>
-            </div>
+            <div className="evidence-row" key={item.factor}><dt>{item.factor}</dt><dd>{item.value}</dd></div>
           ))}
         </dl>
-        <p className="evidence-note">These are the submitted inputs and a transparent payment calculation—not proof that a factor caused the model’s outcome.</p>
+        {data.signals.length > 0 && <p className="evidence-note">Unusual indicators: {data.signals.join(" · ")}. These are signals for review, not proof of fraud.</p>}
       </div>
-      <p className="result-note">Illustrative estimate at {percent(data.demoApr)} APR. “Approved” is a fictional demo label, not a credit decision, loan approval, denial, or offer. Any real application requires verified information, validated policy, fair-lending review, and human oversight.</p>
+      <p className="result-note">Demo only. This is a model recommendation; no real payment is approved, blocked, or changed. Confirm suspicious activity through your institution’s fraud controls.</p>
     </section>
   );
 }

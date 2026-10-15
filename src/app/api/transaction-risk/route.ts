@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loanApplicationSchema, runJevDecision } from "@/lib/jev";
+import { runJevDecision, transactionSchema } from "@/lib/jev";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -9,10 +9,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
-  const validation = loanApplicationSchema.safeParse(body);
+  const validation = transactionSchema.safeParse(body);
   if (!validation.success) {
     return NextResponse.json(
-      { error: "Check the loan application details and try again.", details: validation.error.flatten() },
+      { error: "Check the transaction details and try again.", details: validation.error.flatten() },
       { status: 400 },
     );
   }
@@ -22,9 +22,9 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to assess this demo application.";
+    const message = error instanceof Error ? error.message : "Unable to assess this demo transaction.";
     const status = message === "JEV_API_KEY is not configured" ? 503 : 502;
-    console.error("Loan eligibility demo evaluation failed:", message);
+    console.error("Transaction fraud assessment failed:", message);
     return NextResponse.json({ error: message }, { status });
   }
 }

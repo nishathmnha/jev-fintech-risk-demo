@@ -1,35 +1,23 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { LoanApplication, LoanResult } from "@/lib/jev";
+import type { FraudResult, TransactionInput } from "@/lib/jev";
 
-const examples: { label: string; value: LoanApplication }[] = [
-  {
-    label: "Comfortable repayment",
-    value: { monthlyIncome: 300000, existingMonthlyDebt: 35000, requestedAmount: 1200000, termMonths: 24, employmentMonths: 36, incomeType: "salaried", repaymentHistory: "clean" },
-  },
-  {
-    label: "High existing debt",
-    value: { monthlyIncome: 300000, existingMonthlyDebt: 100000, requestedAmount: 2000000, termMonths: 24, employmentMonths: 48, incomeType: "salaried", repaymentHistory: "one_late_payment" },
-  },
-  {
-    label: "Limited repayment history",
-    value: { monthlyIncome: 220000, existingMonthlyDebt: 35000, requestedAmount: 500000, termMonths: 24, employmentMonths: 3, incomeType: "salaried", repaymentHistory: "limited_history" },
-  },
-  {
-    label: "Variable income",
-    value: { monthlyIncome: 280000, existingMonthlyDebt: 50000, requestedAmount: 900000, termMonths: 24, employmentMonths: 8, incomeType: "self_employed", repaymentHistory: "clean" },
-  },
+const scenarios: { label: string; value: TransactionInput }[] = [
+  { label: "Everyday purchase", value: { amount: 2400, transactionType: "Card Payment", location: "Kandy", newBeneficiary: false, transactionsLast10Minutes: 1, typicalAmount: 5000, newDevice: false } },
+  { label: "Large transfer to new payee", value: { amount: 185000, transactionType: "Bank Transfer", location: "Colombo", newBeneficiary: true, transactionsLast10Minutes: 1, typicalAmount: 15000, newDevice: false } },
+  { label: "Rapid activity on new device", value: { amount: 40000, transactionType: "Card Payment", location: "Kandy", newBeneficiary: false, transactionsLast10Minutes: 4, typicalAmount: 12000, newDevice: true } },
+  { label: "Multiple unusual signals", value: { amount: 250000, transactionType: "Bank Transfer", location: "Colombo", newBeneficiary: true, transactionsLast10Minutes: 5, typicalAmount: 20000, newDevice: true } },
 ];
 
-type Props = { onResult: (result: LoanResult) => void };
+type Props = { onResult: (result: FraudResult) => void };
 
 export default function TransactionForm({ onResult }: Props) {
-  const [form, setForm] = useState<LoanApplication>(examples[0].value);
+  const [form, setForm] = useState<TransactionInput>(scenarios[0].value);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  function update<K extends keyof LoanApplication>(key: K, value: LoanApplication[K]) {
+  function update<K extends keyof TransactionInput>(key: K, value: TransactionInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -38,14 +26,14 @@ export default function TransactionForm({ onResult }: Props) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/loan-eligibility", {
+      const response = await fetch("/api/transaction-risk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "The assessment could not be completed.");
-      onResult(data as LoanResult);
+      onResult(data as FraudResult);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Something went wrong. Please try again.");
     } finally {
@@ -55,59 +43,59 @@ export default function TransactionForm({ onResult }: Props) {
 
   return (
     <form className="transaction-form" onSubmit={submit}>
-      <div className="preset-row" aria-label="Example applications">
-        <span className="field-caption">LOAD A SCENARIO</span>
-        {examples.map((example) => (
-          <button className="preset-button" key={example.label} type="button" onClick={() => { setForm(example.value); setError(""); }}>
-            {example.label}
-          </button>
-        ))}
-      </div>
+      <details className="scenario-picker">
+        <summary>Load a sample transaction</summary>
+        <div className="preset-row" aria-label="Example transactions">
+          {scenarios.map((scenario) => (
+            <button className="preset-button" key={scenario.label} type="button" onClick={() => { setForm(scenario.value); setError(""); }}>
+              {scenario.label}
+            </button>
+          ))}
+        </div>
+      </details>
 
       <div className="form-grid">
         <label className="field">
-          <span>Gross monthly income <small>LKR</small></span>
-          <input required min="1" max="1000000000" step="any" type="number" value={form.monthlyIncome} onChange={(event) => update("monthlyIncome", Number(event.target.value))} />
+          <span>Transaction amount <small>LKR</small></span>
+          <input required min="1" max="10000000000" step="any" type="number" value={form.amount} onChange={(event) => update("amount", Number(event.target.value))} />
         </label>
         <label className="field">
-          <span>Existing monthly debt <small>LKR</small></span>
-          <input required min="0" max="1000000000" step="any" type="number" value={form.existingMonthlyDebt} onChange={(event) => update("existingMonthlyDebt", Number(event.target.value))} />
+          <span>Typical transaction <small>LKR</small></span>
+          <input required min="1" max="10000000000" step="any" type="number" value={form.typicalAmount} onChange={(event) => update("typicalAmount", Number(event.target.value))} />
         </label>
         <label className="field">
-          <span>Requested loan amount <small>LKR</small></span>
-          <input required min="1" max="10000000000" step="any" type="number" value={form.requestedAmount} onChange={(event) => update("requestedAmount", Number(event.target.value))} />
-        </label>
-        <label className="field">
-          <span>Requested term <small>MONTHS</small></span>
-          <input required min="3" max="360" step="1" type="number" value={form.termMonths} onChange={(event) => update("termMonths", Number(event.target.value))} />
-        </label>
-        <label className="field">
-          <span>Time in current employment <small>MONTHS</small></span>
-          <input required min="0" max="1200" step="1" type="number" value={form.employmentMonths} onChange={(event) => update("employmentMonths", Number(event.target.value))} />
-        </label>
-        <label className="field">
-          <span>Income type</span>
-          <select value={form.incomeType} onChange={(event) => update("incomeType", event.target.value as LoanApplication["incomeType"])}>
-            <option value="salaried">Salaried</option>
-            <option value="self_employed">Self-employed</option>
+          <span>Transaction type</span>
+          <select value={form.transactionType} onChange={(event) => update("transactionType", event.target.value)}>
+            {["Bank Transfer", "Card Payment", "Cash Withdrawal", "Online Purchase", "Bill Payment", "Other"].map((type) => <option key={type}>{type}</option>)}
           </select>
+        </label>
+        <label className="field">
+          <span>Location</span>
+          <input required maxLength={120} value={form.location} onChange={(event) => update("location", event.target.value)} />
         </label>
         <label className="field field-wide">
-          <span>Repayment history</span>
-          <select value={form.repaymentHistory} onChange={(event) => update("repaymentHistory", event.target.value as LoanApplication["repaymentHistory"])}>
-            <option value="clean">No recent missed payments</option>
-            <option value="one_late_payment">One recent late payment</option>
-            <option value="multiple_late_payments">Multiple recent late payments</option>
-            <option value="limited_history">Limited repayment history</option>
-          </select>
+          <span>Transactions in the last 10 minutes</span>
+          <input required min="0" max="1000" step="1" type="number" value={form.transactionsLast10Minutes} onChange={(event) => update("transactionsLast10Minutes", Number(event.target.value))} />
+        </label>
+      </div>
+
+      <div className="toggle-row">
+        <label className="toggle-card">
+          <input type="checkbox" checked={form.newBeneficiary} onChange={(event) => update("newBeneficiary", event.target.checked)} />
+          <span className="toggle-mark" aria-hidden="true" />
+          <span><strong>New beneficiary</strong><small>First transfer to this recipient</small></span>
+        </label>
+        <label className="toggle-card">
+          <input type="checkbox" checked={form.newDevice} onChange={(event) => update("newDevice", event.target.checked)} />
+          <span className="toggle-mark" aria-hidden="true" />
+          <span><strong>New device</strong><small>Device not seen on this account</small></span>
         </label>
       </div>
 
       {error && <div className="form-error" role="alert"><span aria-hidden="true">!</span>{error}</div>}
       <button className="submit-button" type="submit" disabled={loading}>
-        {loading ? <><span className="spinner" /> Assessing application…</> : <>Assess demo application <span aria-hidden="true">→</span></>}
+        {loading ? <><span className="spinner" /> Analyzing transaction…</> : <>Assess transaction <span aria-hidden="true">→</span></>}
       </button>
-      <p className="form-footnote">Payment estimate uses an illustrative 18% APR. This is not a loan offer.</p>
     </form>
   );
 }
